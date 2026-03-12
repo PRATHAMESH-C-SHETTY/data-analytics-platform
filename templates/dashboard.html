@@ -1,0 +1,288 @@
+{% extends 'base.html' %}
+{% block title %}Dashboard · DataLens{% endblock %}
+{% block extra_head %}
+<style>
+.hero-gradient {
+  background: linear-gradient(135deg, var(--indigo-dim), transparent 60%);
+  border-radius: 20px; padding: 2rem;
+  border: 1px solid rgba(99,102,241,0.15);
+  margin-bottom: 2rem; position: relative; overflow: hidden;
+}
+.hero-gradient::after {
+  content: ''; position: absolute; top: -60px; right: -60px;
+  width: 220px; height: 220px;
+  background: radial-gradient(circle, rgba(99,102,241,0.12), transparent 70%);
+  border-radius: 50%;
+}
+.workflow-step {
+  display: flex; align-items: center; gap: 8px;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 10px; padding: 0.55rem 1rem;
+  font-size: 0.82rem; font-weight: 500; color: var(--text2);
+  transition: all 0.2s ease; text-decoration: none;
+}
+.workflow-step:hover { border-color: var(--indigo); color: var(--indigo); background: var(--indigo-dim); }
+.workflow-arrow { color: var(--border2); font-size: 0.8rem; }
+.realtime-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--emerald); animation: pulse 2s infinite; }
+@keyframes pulse { 0%,100%{box-shadow:0 0 0 0 rgba(16,185,129,.4)} 50%{box-shadow:0 0 0 6px rgba(16,185,129,0)} }
+</style>
+{% endblock %}
+{% block content %}
+
+<!-- Hero -->
+<div class="hero-gradient">
+  <div class="flex-between flex-wrap gap-md">
+    <div>
+      <h1 style="font-size:1.9rem;font-weight:800;letter-spacing:-.03em;line-height:1.1;margin-bottom:.5rem">
+        {% if user %}Welcome back, {{ user.username }}{% else %}DataLens Analytics{% endif %}
+        <span style="display:inline-block;font-size:1.5rem;margin-left:.25rem">⚡</span>
+      </h1>
+      <p style="color:var(--text3);font-size:.93rem;max-width:520px">
+        Upload any dataset and get instant statistical analysis, interactive visualizations, and downloadable reports — no configuration required.
+      </p>
+    </div>
+    <div class="flex gap-sm">
+      <a href="/upload" class="btn btn-primary btn-lg"><i class="bi bi-cloud-upload"></i> Upload Dataset</a>
+      <a href="/reports" class="btn btn-secondary btn-lg"><i class="bi bi-file-bar-graph"></i> Reports</a>
+    </div>
+  </div>
+</div>
+
+<!-- Metric Cards -->
+<div class="grid g-4 mb-lg" id="metricsGrid">
+  <div class="metric-card" style="--accent-color:var(--indigo)">
+    <div class="flex-between mb-sm">
+      <div class="metric-icon" style="background:var(--indigo-dim);color:var(--indigo)"><i class="bi bi-database-fill"></i></div>
+      <div class="flex gap-sm"><div class="realtime-dot"></div><span class="text-xs text-muted">Live</span></div>
+    </div>
+    <div class="metric-value text-indigo" id="m-datasets">{{ stats.total_datasets }}</div>
+    <div class="metric-label">Datasets Uploaded</div>
+  </div>
+  <div class="metric-card" style="--accent-color:var(--cyan)">
+    <div class="flex-between mb-sm">
+      <div class="metric-icon" style="background:var(--cyan-dim);color:var(--cyan)"><i class="bi bi-file-earmark-bar-graph-fill"></i></div>
+      <div class="flex gap-sm"><div class="realtime-dot"></div><span class="text-xs text-muted">Live</span></div>
+    </div>
+    <div class="metric-value text-cyan" id="m-reports">{{ stats.total_reports }}</div>
+    <div class="metric-label">Reports Generated</div>
+  </div>
+  <div class="metric-card" style="--accent-color:var(--emerald)">
+    <div class="metric-icon" style="background:var(--emerald-dim);color:var(--emerald);margin-bottom:.5rem"><i class="bi bi-table"></i></div>
+    <div class="metric-value text-emerald" id="m-rows">{{ '{:,}'.format(stats.total_rows) }}</div>
+    <div class="metric-label">Total Rows Analyzed</div>
+  </div>
+  <div class="metric-card" style="--accent-color:var(--amber)">
+    <div class="metric-icon" style="background:var(--amber-dim);color:var(--amber);margin-bottom:.5rem"><i class="bi bi-cpu"></i></div>
+    <div class="metric-value text-amber">Auto</div>
+    <div class="metric-label">Schema Detection</div>
+  </div>
+</div>
+
+<!-- Main Grid: Activity Chart + Recent -->
+<div class="grid g-2 mb-lg" style="grid-template-columns: 1.6fr 1fr">
+  <!-- Activity Chart -->
+  <div class="card card-flush">
+    <div class="flex-between" style="padding:1.25rem 1.5rem 0.75rem">
+      <div>
+        <div class="font-bold" style="font-size:.95rem">Activity — Last 7 Days</div>
+        <div class="text-muted text-sm">Dataset uploads &amp; report generation</div>
+      </div>
+    </div>
+    <div id="activityChart" style="height:240px"></div>
+  </div>
+  <!-- File Types -->
+  <div class="card card-flush">
+    <div class="flex-between" style="padding:1.25rem 1.5rem 0.75rem">
+      <div class="font-bold" style="font-size:.95rem">File Type Distribution</div>
+    </div>
+    <div id="fileTypesChart" style="height:240px"></div>
+  </div>
+</div>
+
+<!-- Quick Actions -->
+<div class="grid g-2 mb-lg">
+  <div class="card" style="border-color:rgba(99,102,241,.25);background:linear-gradient(135deg,rgba(99,102,241,.07),var(--surface))">
+    <div class="flex gap-md mb-md">
+      <div class="metric-icon" style="background:var(--indigo-dim);color:var(--indigo);width:52px;height:52px;font-size:1.4rem"><i class="bi bi-cloud-upload-fill"></i></div>
+      <div><div class="font-bold" style="font-size:1rem">Upload a Dataset</div><div class="text-muted text-sm">CSV, Excel, or JSON — any structure</div></div>
+    </div>
+    <p class="text-muted text-sm" style="margin-bottom:1.1rem">DataLens auto-detects column types, cleans data, generates charts, extracts insights, and creates professional reports — all without any configuration.</p>
+    <a href="/upload" class="btn btn-primary"><i class="bi bi-plus-lg"></i> Start Analysis</a>
+  </div>
+  <div class="card" style="border-color:rgba(6,182,212,.2);background:linear-gradient(135deg,rgba(6,182,212,.05),var(--surface))">
+    <div class="flex gap-md mb-md">
+      <div class="metric-icon" style="background:var(--cyan-dim);color:var(--cyan);width:52px;height:52px;font-size:1.4rem"><i class="bi bi-file-earmark-bar-graph-fill"></i></div>
+      <div><div class="font-bold" style="font-size:1rem">Generated Reports</div><div class="text-muted text-sm">Download PDF or Excel exports</div></div>
+    </div>
+    <p class="text-muted text-sm" style="margin-bottom:1.1rem">Access all generated reports, download them in PDF or Excel format, and revisit analytical insights from any previous analysis at any time.</p>
+    <a href="/reports" class="btn btn-secondary"><i class="bi bi-folder2-open"></i> Browse Reports</a>
+  </div>
+</div>
+
+<!-- Workflow -->
+<div class="card mb-lg">
+  <div class="font-bold mb-md">📍 Analytics Workflow</div>
+  <div class="flex flex-wrap gap-sm" style="align-items:center">
+    {% set steps = [
+      ('cloud-upload','Upload','upload'),
+      ('eye','Preview',None),
+      ('cpu','Clean & Detect',None),
+      ('graph-up','Visualize',None),
+      ('lightbulb','Insights',None),
+      ('file-pdf','Export Report','reports')
+    ] %}
+    {% for icon, label, href in steps %}
+      <a href="{{ '/' + href if href else '#' }}" class="workflow-step">
+        <i class="bi bi-{{ icon }}" style="color:var(--indigo)"></i> {{ label }}
+      </a>
+      {% if not loop.last %}<span class="workflow-arrow"><i class="bi bi-arrow-right"></i></span>{% endif %}
+    {% endfor %}
+  </div>
+</div>
+
+<!-- Recent Datasets + Recent Reports side by side -->
+<div class="grid g-2">
+  <!-- Recent Datasets -->
+  <div class="card card-flush">
+    <div class="flex-between" style="padding:1.25rem 1.5rem 0.75rem">
+      <div class="font-bold">Recent Datasets</div>
+      <a href="/datasets" class="btn btn-outline btn-sm">View All <i class="bi bi-arrow-right"></i></a>
+    </div>
+    <div class="table-wrapper">
+      <table class="dl-table" id="recentDatasetsTable">
+        <thead><tr><th>Name</th><th>Type</th><th>Rows</th><th>Uploaded</th><th></th></tr></thead>
+        <tbody id="recentDatasetsBody">
+          {% if recent_datasets %}
+            {% for ds in recent_datasets %}
+            <tr>
+              <td class="td-label">
+                <div class="flex gap-sm">
+                  <i class="bi bi-file-earmark-{% if ds.file_type=='csv' %}text{% elif ds.file_type in ('xlsx','xls') %}spreadsheet{% else %}code{% endif %}" style="color:var(--indigo)"></i>
+                  <span style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ ds.name }}</span>
+                </div>
+              </td>
+              <td><span class="badge badge-indigo">{{ ds.file_type.upper() }}</span></td>
+              <td>{{ '{:,}'.format(ds.num_rows) }}</td>
+              <td class="text-muted">{{ ds.uploaded_at.strftime('%b %d') }}</td>
+              <td>
+                <div class="flex gap-sm">
+                  <a href="/preview/{{ ds.id }}" class="btn btn-outline btn-sm"><i class="bi bi-eye"></i></a>
+                  <a href="/analyze/{{ ds.id }}" class="btn btn-primary btn-sm"><i class="bi bi-graph-up"></i></a>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          {% else %}
+            <tr><td colspan="5"><div class="empty-state"><div class="empty-state-icon">📂</div><p>No datasets yet</p><a href="/upload" class="btn btn-primary btn-sm">Upload Now</a></div></td></tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Recent Reports -->
+  <div class="card card-flush">
+    <div class="flex-between" style="padding:1.25rem 1.5rem 0.75rem">
+      <div class="font-bold">Recent Reports</div>
+      <a href="/reports" class="btn btn-outline btn-sm">View All <i class="bi bi-arrow-right"></i></a>
+    </div>
+    <div class="table-wrapper">
+      <table class="dl-table" id="recentReportsTable">
+        <thead><tr><th>Name</th><th>Type</th><th>Size</th><th>Created</th><th></th></tr></thead>
+        <tbody id="recentReportsBody">
+          {% if recent_reports %}
+            {% for r in recent_reports %}
+            <tr>
+              <td class="td-label">
+                <div class="flex gap-sm">
+                  <i class="bi bi-file-earmark-{% if r.report_type=='pdf' %}pdf{% else %}spreadsheet{% endif %}"
+                     style="color:{% if r.report_type=='pdf' %}var(--rose){% else %}var(--emerald){% endif %}"></i>
+                  <span style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ r.name }}</span>
+                </div>
+              </td>
+              <td><span class="badge {% if r.report_type=='pdf' %}badge-rose{% else %}badge-emerald{% endif %}">{{ r.report_type.upper() }}</span></td>
+              <td class="text-muted">{{ r.file_size }}MB</td>
+              <td class="text-muted">{{ r.created_at.strftime('%b %d') }}</td>
+              <td><a href="/report/download/{{ r.id }}" class="btn btn-primary btn-sm"><i class="bi bi-download"></i></a></td>
+            </tr>
+            {% endfor %}
+          {% else %}
+            <tr><td colspan="5"><div class="empty-state"><div class="empty-state-icon">📋</div><p>No reports yet</p></div></td></tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script>
+// ── Render activity + file-type charts from real API ──────────
+async function loadDashboardCharts() {
+  try {
+    const r    = await fetch('/api/dashboard/stats');
+    const data = await r.json();
+    renderActivityChart(data.activity);
+    renderFileTypesChart(data.file_types);
+    // Animate counters
+    ['m-datasets','m-reports'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) animateCounter(el, parseInt(el.textContent.replace(/,/g,'')) || 0);
+    });
+  } catch(e) { console.warn('Dashboard stats error:', e); }
+}
+
+function renderActivityChart(activity) {
+  const theme = getPlotlyTheme();
+  const dates   = Object.keys(activity);
+  const uploads  = dates.map(d => activity[d].uploads);
+  const rpts     = dates.map(d => activity[d].reports);
+  const labels   = dates.map(d => { const dt = new Date(d); return dt.toLocaleDateString('en',{month:'short',day:'numeric'}); });
+
+  Plotly.newPlot('activityChart', [
+    { name:'Uploads',  x:labels, y:uploads, type:'bar', marker:{color:'rgba(99,102,241,0.85)', cornerradius:4} },
+    { name:'Reports',  x:labels, y:rpts,    type:'bar', marker:{color:'rgba(6,182,212,0.85)', cornerradius:4} },
+  ], {
+    ...theme, barmode:'group',
+    margin:{l:30,r:10,t:10,b:35},
+    legend:{orientation:'h',x:0,y:1.15,font:{size:10}},
+    height:240,
+  }, { responsive:true, displayModeBar:false });
+}
+
+function renderFileTypesChart(types) {
+  const theme  = getPlotlyTheme();
+  const labels = Object.keys(types);
+  const vals   = Object.values(types);
+  if (labels.length === 0) {
+    document.getElementById('fileTypesChart').innerHTML =
+      '<div class="empty-state" style="padding:2rem"><div class="empty-state-icon">📊</div><p>Upload datasets to see distribution</p></div>';
+    return;
+  }
+  const pal = ['#6366f1','#06b6d4','#10b981','#f59e0b'];
+  Plotly.newPlot('fileTypesChart', [{
+    labels, values:vals, type:'pie', hole:0.5,
+    marker:{colors:pal.slice(0,labels.length), line:{color:'rgba(0,0,0,0.2)',width:2}},
+    textinfo:'label+percent', hovertemplate:'%{label}<br>Count: %{value}<extra></extra>',
+  }], {
+    ...theme, margin:{l:10,r:10,t:10,b:10}, height:240,
+    legend:{orientation:'v',x:0.75,y:0.5,font:{size:10}},
+  }, { responsive:true, displayModeBar:false });
+}
+
+// ── Auto-refresh every 30 seconds ─────────────────────────────
+loadDashboardCharts();
+setInterval(loadDashboardCharts, 30000);
+
+// Re-render on theme change
+document.getElementById('themeToggle').addEventListener('click', () => {
+  setTimeout(() => {
+    fetch('/api/dashboard/stats').then(r=>r.json()).then(data => {
+      renderActivityChart(data.activity);
+      renderFileTypesChart(data.file_types);
+    });
+  }, 120);
+});
+</script>
+{% endblock %}

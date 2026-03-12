@@ -1,0 +1,124 @@
+{% extends 'base.html' %}
+{% block title %}Reports · DataLens{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div class="breadcrumb"><a href="/">Dashboard</a><i class="bi bi-chevron-right"></i><span>Reports</span></div>
+  <div class="flex-between flex-wrap gap-md">
+    <div>
+      <h1 class="page-title">Reports</h1>
+      <p class="page-sub">All generated PDF and Excel reports — stored and ready to download</p>
+    </div>
+    <a href="/upload" class="btn btn-primary"><i class="bi bi-plus-lg"></i> New Analysis</a>
+  </div>
+</div>
+
+<!-- Stats row -->
+<div class="grid g-4 mb-lg">
+  {% set pdf_count  = reports | selectattr('report_type','eq','pdf')  | list | length %}
+  {% set xlsx_count = reports | selectattr('report_type','eq','xlsx') | list | length %}
+  {% set total_size = reports | sum(attribute='file_size') %}
+  <div class="metric-card" style="--accent-color:var(--indigo)">
+    <div class="metric-icon" style="background:var(--indigo-dim);color:var(--indigo);margin-bottom:.5rem"><i class="bi bi-file-earmark-bar-graph-fill"></i></div>
+    <div class="metric-value text-indigo">{{ reports|length }}</div>
+    <div class="metric-label">Total Reports</div>
+  </div>
+  <div class="metric-card" style="--accent-color:var(--rose)">
+    <div class="metric-icon" style="background:var(--rose-dim);color:var(--rose);margin-bottom:.5rem"><i class="bi bi-file-earmark-pdf-fill"></i></div>
+    <div class="metric-value text-rose">{{ pdf_count }}</div>
+    <div class="metric-label">PDF Reports</div>
+  </div>
+  <div class="metric-card" style="--accent-color:var(--emerald)">
+    <div class="metric-icon" style="background:var(--emerald-dim);color:var(--emerald);margin-bottom:.5rem"><i class="bi bi-file-earmark-spreadsheet-fill"></i></div>
+    <div class="metric-value text-emerald">{{ xlsx_count }}</div>
+    <div class="metric-label">Excel Reports</div>
+  </div>
+  <div class="metric-card" style="--accent-color:var(--amber)">
+    <div class="metric-icon" style="background:var(--amber-dim);color:var(--amber);margin-bottom:.5rem"><i class="bi bi-hdd-fill"></i></div>
+    <div class="metric-value text-amber">{{ '%.1f'|format(total_size) }}MB</div>
+    <div class="metric-label">Total Size</div>
+  </div>
+</div>
+
+{% if reports %}
+<div class="card card-flush">
+  <div class="flex-between" style="padding:1.25rem 1.5rem .75rem">
+    <div class="font-bold">All Reports</div>
+    <div class="flex gap-sm">
+      <input type="text" id="reportSearch" class="form-control" placeholder="Search reports…" style="width:220px" oninput="filterReports(this.value)">
+    </div>
+  </div>
+  <div class="table-wrapper">
+    <table class="dl-table" id="reportsTable">
+      <thead>
+        <tr>
+          <th>Report Name</th><th>Dataset</th><th>Type</th><th>Size</th><th>Generated</th><th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for report in reports %}
+        <tr class="report-row" data-name="{{ report.name|lower }}" data-dataset="{{ (report.dataset.name if report.dataset else '')|lower }}">
+          <td class="td-label">
+            <div class="flex gap-sm">
+              <i class="bi bi-file-earmark-{% if report.report_type == 'pdf' %}pdf{% else %}spreadsheet{% endif %}"
+                 style="color:{% if report.report_type == 'pdf' %}var(--rose){% else %}var(--emerald){% endif %};font-size:1.2rem"></i>
+              <span style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="{{ report.name }}">{{ report.name }}</span>
+            </div>
+          </td>
+          <td>
+            {% if report.dataset %}
+              <a href="/preview/{{ report.dataset.id }}" style="color:var(--cyan);text-decoration:underline dotted">{{ report.dataset.name }}</a>
+            {% else %}
+              <span class="text-muted">—</span>
+            {% endif %}
+          </td>
+          <td>
+            <span class="badge {% if report.report_type == 'pdf' %}badge-rose{% else %}badge-emerald{% endif %}">
+              {{ report.report_type.upper() }}
+            </span>
+          </td>
+          <td class="text-muted font-mono">{{ report.file_size }} MB</td>
+          <td class="text-muted">{{ report.created_at.strftime('%b %d, %Y %H:%M') }}</td>
+          <td>
+            <div class="flex gap-sm">
+              <a href="/report/download/{{ report.id }}" class="btn btn-primary btn-sm">
+                <i class="bi bi-download"></i> Download
+              </a>
+              {% if report.dataset %}
+              <a href="/analyze/{{ report.dataset_id }}" class="btn btn-outline btn-sm" title="Re-analyze">
+                <i class="bi bi-arrow-repeat"></i>
+              </a>
+              {% endif %}
+              <form action="/report/delete/{{ report.id }}" method="POST" style="display:inline" onsubmit="return confirm('Delete this report?')">
+                <button type="submit" class="btn btn-danger btn-sm" title="Delete">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="card empty-state" style="padding:5rem 2rem">
+  <div class="empty-state-icon">📋</div>
+  <h3>No Reports Yet</h3>
+  <p>Upload a dataset and run an analysis to generate your first report. Reports are automatically stored here.</p>
+  <a href="/upload" class="btn btn-primary"><i class="bi bi-cloud-upload"></i> Upload Dataset</a>
+</div>
+{% endif %}
+{% endblock %}
+{% block scripts %}
+<script>
+function filterReports(q) {
+  q = q.toLowerCase();
+  document.querySelectorAll('.report-row').forEach(row => {
+    const name    = row.dataset.name || '';
+    const dataset = row.dataset.dataset || '';
+    row.style.display = (name.includes(q) || dataset.includes(q)) ? '' : 'none';
+  });
+}
+</script>
+{% endblock %}

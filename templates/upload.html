@@ -1,0 +1,167 @@
+{% extends 'base.html' %}
+{% block title %}Upload Dataset · DataLens{% endblock %}
+{% block extra_head %}
+<style>
+.format-card {
+  background: var(--surface2); border: 1px solid var(--border); border-radius: 12px;
+  padding: 1rem; display: flex; align-items: flex-start; gap: 10px;
+  transition: all 0.2s ease;
+}
+.format-card:hover { border-color: var(--indigo); }
+.format-icon { width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; flex-shrink: 0; }
+.file-preview-row { display: flex; align-items: center; gap: 12px; background: var(--surface2); border: 1px solid var(--border); border-radius: 12px; padding: 1rem; animation: slideDown 0.25s ease; }
+.progress-wrap { background: var(--surface3); border-radius: 99px; height: 6px; overflow: hidden; }
+.progress-bar  { height: 100%; border-radius: 99px; background: linear-gradient(90deg, var(--indigo), var(--cyan)); transition: width 0.3s ease; }
+</style>
+{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div class="breadcrumb"><a href="/">Dashboard</a><i class="bi bi-chevron-right"></i><span>Upload Dataset</span></div>
+  <h1 class="page-title">Upload Dataset</h1>
+  <p class="page-sub">Upload any CSV, Excel, or JSON file — DataLens handles schema detection and analysis automatically.</p>
+</div>
+
+<div class="grid g-2" style="grid-template-columns:1.5fr 1fr;gap:1.5rem;align-items:start">
+
+  <!-- Upload Form -->
+  <div>
+    <div class="card mb-md">
+      <form id="uploadForm" action="/upload" method="POST" enctype="multipart/form-data">
+        <!-- Drop Zone -->
+        <div class="upload-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+          <input type="file" id="fileInput" name="file" accept=".csv,.xlsx,.xls,.json" onchange="onFileSelect(this)">
+          <div style="font-size:2.8rem;color:var(--indigo);margin-bottom:.75rem"><i class="bi bi-cloud-arrow-up-fill"></i></div>
+          <div class="font-bold" style="font-size:1.05rem;margin-bottom:.4rem">Drag &amp; Drop your file here</div>
+          <p class="text-muted text-sm" style="margin-bottom:.85rem">or click to browse — CSV, Excel, JSON up to 100 MB</p>
+          <div class="flex gap-sm" style="justify-content:center;flex-wrap:wrap">
+            <span class="badge badge-indigo"><i class="bi bi-filetype-csv"></i> CSV</span>
+            <span class="badge badge-cyan"><i class="bi bi-file-earmark-spreadsheet"></i> XLSX / XLS</span>
+            <span class="badge badge-amber"><i class="bi bi-filetype-json"></i> JSON</span>
+          </div>
+        </div>
+
+        <!-- File preview -->
+        <div id="filePreview" style="display:none;margin-top:1rem">
+          <div class="file-preview-row">
+            <div id="fp-icon" style="font-size:2rem;color:var(--indigo)"></div>
+            <div style="flex:1;min-width:0">
+              <div id="fp-name" class="font-bold" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></div>
+              <div id="fp-size" class="text-muted text-sm"></div>
+            </div>
+            <button type="button" onclick="clearFile()" style="background:none;border:none;color:var(--rose);cursor:pointer;font-size:1.2rem"><i class="bi bi-x-circle-fill"></i></button>
+          </div>
+        </div>
+
+        <!-- Description -->
+        <div class="form-group" style="margin-top:1rem">
+          <label class="form-label">Description <span class="text-muted">(optional)</span></label>
+          <textarea name="description" class="form-control" rows="2" placeholder="Brief description of this dataset…"></textarea>
+        </div>
+
+        <!-- Progress -->
+        <div id="uploadProgress" style="display:none;margin-bottom:1rem">
+          <div class="flex-between mb-sm"><span class="text-sm text-muted" id="progressMsg">Uploading…</span><span class="text-sm font-mono" id="progressPct">0%</span></div>
+          <div class="progress-wrap"><div class="progress-bar" id="progressBar" style="width:0%"></div></div>
+        </div>
+
+        <div class="flex gap-sm">
+          <button type="submit" class="btn btn-primary" id="submitBtn" disabled>
+            <i class="bi bi-cloud-upload"></i> Upload &amp; Analyze
+          </button>
+          <button type="button" class="btn btn-secondary" onclick="clearFile()"><i class="bi bi-x"></i> Clear</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Sidebar info -->
+  <div>
+    <div class="card mb-md">
+      <div class="font-bold mb-md" style="color:var(--indigo)"><i class="bi bi-magic"></i> What happens after upload?</div>
+      {% set steps = [
+        ('1','Schema Detection','Column types (numeric, categorical, datetime) auto-detected','indigo'),
+        ('2','Data Cleaning','Duplicates removed, missing values imputed, types normalized','cyan'),
+        ('3','Statistical Analysis','Mean, median, std dev, skewness, correlations computed','emerald'),
+        ('4','Visualization','Auto-generated histograms, scatter plots, heatmaps & more','amber'),
+        ('5','Insight Engine','Anomalies, patterns, and correlations extracted automatically','violet'),
+        ('6','Report Export','PDF &amp; Excel reports created and stored in Reports section','rose'),
+      ] %}
+      {% for num, title, desc, color in steps %}
+      <div class="flex gap-sm" style="margin-bottom:.75rem;align-items:flex-start">
+        <div style="width:22px;height:22px;background:var(--{{ color }});border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:.7rem;font-weight:700;color:#fff;flex-shrink:0;margin-top:1px">{{ num }}</div>
+        <div><div class="font-bold text-sm">{{ title }}</div><div class="text-muted text-xs" style="margin-top:1px">{{ desc }}</div></div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <div class="card">
+      <div class="font-bold mb-md" style="color:var(--cyan)"><i class="bi bi-info-circle"></i> Supported Formats</div>
+      {% set formats = [
+        ('filetype-csv','CSV','Comma or semicolon separated. UTF-8 or Latin-1 encoding. Any number of columns.','indigo'),
+        ('file-earmark-spreadsheet','Excel','XLSX or XLS. First sheet used. Column headers in row 1.','cyan'),
+        ('filetype-json','JSON','Array of objects or key→array dictionary structure.','amber'),
+      ] %}
+      {% for icon, name, desc, color in formats %}
+      <div class="format-card mb-sm">
+        <div class="format-icon" style="background:var(--{{ color }}-dim);color:var(--{{ color }})"><i class="bi bi-{{ icon }}"></i></div>
+        <div><div class="font-bold text-sm">{{ name }}</div><div class="text-muted text-xs" style="margin-top:2px">{{ desc }}</div></div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const dropZone  = document.getElementById('dropZone');
+const fileInput = document.getElementById('fileInput');
+const submitBtn = document.getElementById('submitBtn');
+
+dropZone.addEventListener('dragover',  e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault(); dropZone.classList.remove('dragover');
+  if (e.dataTransfer.files.length) {
+    fileInput.files = e.dataTransfer.files;
+    onFileSelect(fileInput);
+  }
+});
+
+const EXT_ICONS = { csv:'bi-filetype-csv', xlsx:'bi-file-earmark-spreadsheet', xls:'bi-file-earmark-spreadsheet', json:'bi-filetype-json' };
+
+function onFileSelect(input) {
+  if (!input.files.length) return;
+  const file = input.files[0];
+  const ext  = file.name.split('.').pop().toLowerCase();
+  document.getElementById('fp-icon').innerHTML = `<i class="bi ${EXT_ICONS[ext]||'bi-file-earmark'}"></i>`;
+  document.getElementById('fp-name').textContent = file.name;
+  document.getElementById('fp-size').textContent = (file.size/1024/1024).toFixed(2) + ' MB';
+  document.getElementById('filePreview').style.display = 'block';
+  submitBtn.disabled = false;
+}
+
+function clearFile() {
+  fileInput.value = '';
+  document.getElementById('filePreview').style.display = 'none';
+  submitBtn.disabled = true;
+}
+
+document.getElementById('uploadForm').addEventListener('submit', function() {
+  submitBtn.disabled = true;
+  submitBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Processing…';
+  const prog  = document.getElementById('uploadProgress');
+  const bar   = document.getElementById('progressBar');
+  const msg   = document.getElementById('progressMsg');
+  const pct   = document.getElementById('progressPct');
+  prog.style.display = 'block';
+  const msgs  = ['Uploading file…','Detecting schema…','Computing statistics…','Generating insights…','Finalising…'];
+  let p=0, i=0;
+  const iv = setInterval(() => {
+    p = Math.min(p + (p < 70 ? 4 : 1), 92);
+    bar.style.width = p + '%';
+    pct.textContent = p + '%';
+    if (p > i*18) { msg.textContent = msgs[Math.min(i, msgs.length-1)]; i++; }
+  }, 200);
+});
+</script>
+{% endblock %}

@@ -1,0 +1,72 @@
+{% extends 'base.html' %}
+{% block title %}Sign Up · DataLens{% endblock %}
+{% block extra_head %}
+<style>
+.auth-wrap { display:flex; justify-content:center; align-items:center; min-height:72vh; padding:2rem 0; }
+.auth-card { width:100%; max-width:420px; }
+.auth-logo { width:52px;height:52px;background:linear-gradient(135deg,var(--indigo),var(--cyan));border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:1.5rem;margin:0 auto 1.25rem;box-shadow:0 0 30px rgba(99,102,241,.4); }
+.pwd-strength { height:4px;border-radius:99px;background:var(--surface3);overflow:hidden;margin-top:5px; }
+.pwd-fill { height:100%;border-radius:99px;transition:all .3s; }
+</style>
+{% endblock %}
+{% block content %}
+<div class="auth-wrap">
+  <div class="auth-card">
+    <div style="text-align:center;margin-bottom:1.75rem">
+      <div class="auth-logo">⚡</div>
+      <h2 style="font-weight:800;font-size:1.5rem;letter-spacing:-.03em;margin-bottom:.35rem">Create Account</h2>
+      <p class="text-muted text-sm">Start analyzing your data with DataLens — free, no credit card required.</p>
+    </div>
+
+    <div class="card">
+      <form method="POST" action="/signup">
+        <div class="form-group">
+          <label class="form-label">Username</label>
+          <input type="text" name="username" class="form-control" placeholder="johndoe" required autocomplete="username" minlength="3">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Email Address</label>
+          <input type="email" name="email" class="form-control" placeholder="you@example.com" required autocomplete="email">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Password</label>
+          <input type="password" name="password" id="pwdInput" class="form-control" placeholder="Min. 8 characters" required minlength="8" autocomplete="new-password" oninput="checkPwd(this.value)">
+          <div class="pwd-strength mt-1"><div class="pwd-fill" id="pwdFill"></div></div>
+          <div class="text-xs text-muted" id="pwdLabel" style="margin-top:3px"></div>
+        </div>
+        <button type="submit" class="btn btn-primary w-full" style="justify-content:center;padding:.7rem;font-size:.95rem;margin-top:.5rem">
+          Create Account <i class="bi bi-arrow-right"></i>
+        </button>
+      </form>
+    </div>
+
+    <p style="text-align:center;margin-top:1rem;font-size:.875rem;color:var(--text3)">
+      Already have an account?
+      <a href="/login" style="color:var(--indigo);font-weight:600">Sign In</a>
+    </p>
+    <p style="text-align:center;margin-top:.5rem">
+      <a href="/" class="text-muted text-sm"><i class="bi bi-arrow-left"></i> Continue without account</a>
+    </p>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+function checkPwd(v) {
+  const fill = document.getElementById('pwdFill');
+  const label = document.getElementById('pwdLabel');
+  let score = 0;
+  if (v.length >= 8) score++;
+  if (/[A-Z]/.test(v)) score++;
+  if (/[0-9]/.test(v)) score++;
+  if (/[^A-Za-z0-9]/.test(v)) score++;
+  const pcts   = [0,25,50,75,100];
+  const colors = ['','#ef4444','#f59e0b','#10b981','#6366f1'];
+  const texts  = ['','Weak','Fair','Good','Strong'];
+  fill.style.width  = pcts[score] + '%';
+  fill.style.background = colors[score] || 'transparent';
+  label.textContent = texts[score] || '';
+  label.style.color = colors[score] || 'transparent';
+}
+</script>
+{% endblock %}

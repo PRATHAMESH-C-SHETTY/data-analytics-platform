@@ -1,0 +1,385 @@
+{% extends 'base.html' %}
+{% block title %}Analysis: {{ dataset.name }} · DataLens{% endblock %}
+{% block extra_head %}
+<style>
+.tab-panel { display: none; }
+.tab-panel.active { display: block; animation: fadeUp .25s ease; }
+@keyframes fadeUp { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:none} }
+.stat-row { display:flex; justify-content:space-between; padding:.5rem 0; border-bottom:1px solid var(--border); font-size:.83rem; }
+.stat-row:last-child { border-bottom:none; }
+.stat-k { color:var(--text3); font-weight:500; }
+.stat-v { font-family:var(--mono); font-weight:600; color:var(--text); }
+.corr-cell { text-align:center; font-family:var(--mono); font-size:.75rem; padding:.4rem .6rem !important; }
+.insight-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:.85rem; }
+@media(max-width:768px){ .insight-grid{grid-template-columns:1fr} }
+.charts-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:1rem; }
+@media(max-width:900px){ .charts-grid{grid-template-columns:1fr} }
+.gen-btn-group { display:flex; gap:.5rem; flex-wrap:wrap; }
+</style>
+{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <div class="breadcrumb">
+    <a href="/">Dashboard</a><i class="bi bi-chevron-right"></i>
+    <a href="/datasets">Datasets</a><i class="bi bi-chevron-right"></i>
+    <a href="/preview/{{ dataset.id }}">{{ dataset.name }}</a><i class="bi bi-chevron-right"></i>
+    <span>Analysis</span>
+  </div>
+  <div class="flex-between flex-wrap gap-md">
+    <div>
+      <h1 class="page-title">Analysis Dashboard</h1>
+      <p class="page-sub">{{ dataset.name }} · {{ '{:,}'.format(dataset.num_rows) }} rows × {{ dataset.num_cols }} columns · Schema-independent automated analysis</p>
+    </div>
+    <div class="gen-btn-group" id="reportButtons" style="display:none">
+      <button class="btn btn-primary" id="btnPDF" onclick="generateReport('pdf')">
+        <i class="bi bi-file-pdf"></i> Export PDF
+      </button>
+      <button class="btn btn-secondary" id="btnXLSX" onclick="generateReport('xlsx')">
+        <i class="bi bi-file-earmark-spreadsheet"></i> Export Excel
+      </button>
+      <a href="/preview/{{ dataset.id }}" class="btn btn-outline"><i class="bi bi-eye"></i> Preview Data</a>
+    </div>
+  </div>
+</div>
+
+<!-- Loading -->
+<div id="loadingState">
+  <div class="loading-state">
+    <div class="spinner"></div>
+    <div>
+      <div class="font-bold" style="font-size:1.05rem;margin-bottom:4px">Running Analysis…</div>
+      <div class="text-muted text-sm" id="loadMsg">Detecting schema and column types</div>
+    </div>
+    <div style="width:280px">
+      <div class="progress-wrap" style="height:4px"><div class="progress-bar" id="loadBar" style="width:0%;height:4px;background:linear-gradient(90deg,var(--indigo),var(--cyan));border-radius:99px;transition:width .4s ease"></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- Analysis Content -->
+<div id="analysisContent" style="display:none">
+
+  <!-- Metric Overview -->
+  <div class="grid g-4 mb-lg" id="analysisMetrics"></div>
+
+  <!-- Tabs -->
+  <div class="flex gap-sm mb-lg flex-wrap">
+    <div class="tabs">
+      <button class="tab-btn active" onclick="switchTab('charts')"><i class="bi bi-bar-chart-fill"></i> Charts</button>
+      <button class="tab-btn" onclick="switchTab('overview')"><i class="bi bi-grid-1x2"></i> Overview</button>
+      <button class="tab-btn" onclick="switchTab('stats')"><i class="bi bi-table"></i> Statistics</button>
+      <button class="tab-btn" onclick="switchTab('insights')"><i class="bi bi-lightbulb-fill"></i> Insights</button>
+    </div>
+    <div style="margin-left:auto" class="gen-btn-group flex gap-sm">
+      <button class="btn btn-primary btn-sm" id="btnPDF2" onclick="generateReport('pdf')"><i class="bi bi-file-pdf"></i> PDF</button>
+      <button class="btn btn-secondary btn-sm" id="btnXLSX2" onclick="generateReport('xlsx')"><i class="bi bi-file-earmark-spreadsheet"></i> Excel</button>
+    </div>
+  </div>
+
+  <!-- Charts Tab -->
+  <div class="tab-panel active" id="tab-charts">
+    <div class="charts-grid" id="chartsContainer"></div>
+  </div>
+
+  <!-- Overview Tab -->
+  <div class="tab-panel" id="tab-overview">
+    <div class="grid g-2" id="overviewContent"></div>
+  </div>
+
+  <!-- Statistics Tab -->
+  <div class="tab-panel" id="tab-stats">
+    <div id="statsContent"></div>
+  </div>
+
+  <!-- Insights Tab -->
+  <div class="tab-panel" id="tab-insights">
+    <div class="insight-grid" id="insightsContent"></div>
+  </div>
+
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script>
+const DATASET_ID = {{ dataset.id }};
+let analysisData = null;
+let chartsRendered = false;
+
+// ── Loading animation ──────────────────────────────────────────
+const loadMsgs = ['Detecting schema and column types','Cleaning and imputing data','Computing statistical measures','Building visualizations','Extracting analytical insights','Finalising report data…'];
+let msgIdx = 0, pct = 0;
+const loadMsg = document.getElementById('loadMsg');
+const loadBar = document.getElementById('loadBar');
+const iv = setInterval(() => {
+  pct = Math.min(pct + 3, 90);
+  loadBar.style.width = pct + '%';
+  if (pct % 15 === 0) loadMsg.textContent = loadMsgs[Math.min(msgIdx++, loadMsgs.length-1)];
+}, 180);
+
+// ── Fetch analysis ─────────────────────────────────────────────
+fetch(`/api/analyze/${DATASET_ID}`)
+  .then(r => r.json())
+  .then(data => {
+    clearInterval(iv);
+    loadBar.style.width = '100%';
+    if (data.error) { loadMsg.innerHTML = `<span class="text-rose">Error: ${data.error}</span>`; return; }
+    analysisData = data;
+    setTimeout(() => {
+      document.getElementById('loadingState').style.display = 'none';
+      document.getElementById('analysisContent').style.display = 'block';
+      document.getElementById('reportButtons').style.display = 'flex';
+      renderMetrics(data);
+      renderCharts(data.charts);
+      renderOverview(data);
+      renderStats(data.stats);
+      renderInsights(data.insights);
+    }, 300);
+  })
+  .catch(err => {
+    clearInterval(iv);
+    loadMsg.innerHTML = `<span class="text-rose"><i class="bi bi-exclamation-circle"></i> ${err.message}</span>`;
+  });
+
+// ── Tab switching ──────────────────────────────────────────────
+function switchTab(name) {
+  document.querySelectorAll('.tab-btn').forEach((b,i) => {
+    const names=['charts','overview','stats','insights'];
+    b.classList.toggle('active', names[i]===name);
+  });
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById(`tab-${name}`).classList.add('active');
+}
+
+// ── Metrics ────────────────────────────────────────────────────
+function renderMetrics(data) {
+  const { stats, shape } = data;
+  const nc = Object.keys(stats.numeric||{}).length;
+  const cc = Object.keys(stats.categorical||{}).length;
+  const dc = Object.keys(stats.datetime||{}).length;
+  document.getElementById('analysisMetrics').innerHTML = `
+    <div class="metric-card" style="--accent-color:var(--indigo)">
+      <div class="metric-icon" style="background:var(--indigo-dim);color:var(--indigo);margin-bottom:.5rem"><i class="bi bi-grid-3x3"></i></div>
+      <div class="metric-value text-indigo">${fmtComma(shape.rows)}</div>
+      <div class="metric-label">Rows Analyzed</div>
+    </div>
+    <div class="metric-card" style="--accent-color:var(--cyan)">
+      <div class="metric-icon" style="background:var(--cyan-dim);color:var(--cyan);margin-bottom:.5rem"><i class="bi bi-123"></i></div>
+      <div class="metric-value text-cyan">${nc}</div>
+      <div class="metric-label">Numeric Columns</div>
+    </div>
+    <div class="metric-card" style="--accent-color:var(--emerald)">
+      <div class="metric-icon" style="background:var(--emerald-dim);color:var(--emerald);margin-bottom:.5rem"><i class="bi bi-fonts"></i></div>
+      <div class="metric-value text-emerald">${cc}</div>
+      <div class="metric-label">Categorical Cols</div>
+    </div>
+    <div class="metric-card" style="--accent-color:var(--amber)">
+      <div class="metric-icon" style="background:var(--amber-dim);color:var(--amber);margin-bottom:.5rem"><i class="bi bi-graph-up"></i></div>
+      <div class="metric-value text-amber">${data.charts.length}</div>
+      <div class="metric-label">Charts Generated</div>
+    </div>`;
+}
+
+// ── Charts ─────────────────────────────────────────────────────
+function renderCharts(charts) {
+  const container = document.getElementById('chartsContainer');
+  if (!charts || !charts.length) {
+    container.innerHTML = '<div class="card empty-state"><div class="empty-state-icon">📊</div><p>No charts could be generated for this dataset structure.</p></div>';
+    return;
+  }
+  charts.forEach((ch, i) => {
+    const div = document.createElement('div');
+    div.className = 'chart-card';
+    const id = `chart-${i}`;
+    div.innerHTML = `<div id="${id}"></div>`;
+    container.appendChild(div);
+    const fig = ch.data;
+    const theme = getPlotlyTheme();
+    const layout = { ...fig.layout, ...theme, margin:{l:45,r:20,t:45,b:45}, height:340 };
+    if (layout.title && typeof layout.title === 'object') layout.title.font = { ...layout.title.font, color: document.documentElement.dataset.theme==='dark' ? '#e2e8f0' : '#0f172a' };
+    Plotly.newPlot(id, fig.data, layout, { responsive:true, displayModeBar:false });
+  });
+  chartsRendered = true;
+}
+
+// ── Overview ───────────────────────────────────────────────────
+function renderOverview(data) {
+  const { stats } = data;
+  let html = '';
+
+  // Numeric summary cards
+  const numEntries = Object.entries(stats.numeric||{});
+  if (numEntries.length) {
+    html += `<div class="card"><div class="font-bold mb-md text-indigo"><i class="bi bi-123"></i> Numeric Columns</div>`;
+    numEntries.forEach(([col, s]) => {
+      html += `<div style="margin-bottom:1rem">
+        <div class="font-bold text-sm mb-sm">${col}</div>
+        <div class="stat-row"><span class="stat-k">Mean</span><span class="stat-v">${s.mean}</span></div>
+        <div class="stat-row"><span class="stat-k">Median</span><span class="stat-v">${s.median}</span></div>
+        <div class="stat-row"><span class="stat-k">Std Dev</span><span class="stat-v">${s.std}</span></div>
+        <div class="stat-row"><span class="stat-k">Range</span><span class="stat-v">${s.min} → ${s.max}</span></div>
+      </div>`;
+    });
+    html += '</div>';
+  }
+
+  // Categorical
+  const catEntries = Object.entries(stats.categorical||{});
+  if (catEntries.length) {
+    html += `<div class="card"><div class="font-bold mb-md text-cyan"><i class="bi bi-fonts"></i> Categorical Columns</div>`;
+    catEntries.forEach(([col, s]) => {
+      const top5 = Object.entries(s.top_10||{}).slice(0,5);
+      const maxVal = top5.length ? top5[0][1] : 1;
+      html += `<div style="margin-bottom:1.1rem">
+        <div class="flex-between mb-sm"><span class="font-bold text-sm">${col}</span><span class="badge badge-cyan">${s.unique_count} unique</span></div>`;
+      top5.forEach(([k, v]) => {
+        const pct = Math.round(v/maxVal*100);
+        html += `<div style="margin-bottom:5px">
+          <div class="flex-between text-xs mb-sm"><span class="text-muted">${String(k).slice(0,28)}</span><span class="font-bold">${v.toLocaleString()}</span></div>
+          <div class="stat-bar"><div class="stat-fill fill-cyan" style="width:${pct}%"></div></div>
+        </div>`;
+      });
+      html += '</div>';
+    });
+    html += '</div>';
+  }
+
+  document.getElementById('overviewContent').innerHTML = html || '<div class="card"><p class="text-muted">No overview data available.</p></div>';
+}
+
+// ── Statistics ─────────────────────────────────────────────────
+function renderStats(stats) {
+  let html = '';
+
+  if (Object.keys(stats.numeric||{}).length) {
+    html += `<div class="card card-flush mb-md"><div class="flex-between" style="padding:1.25rem 1.5rem .75rem">
+      <div class="font-bold"><i class="bi bi-calculator text-indigo"></i> Numeric Statistics</div></div>
+      <div class="table-wrapper"><table class="dl-table">
+        <thead><tr><th>Column</th><th>Mean</th><th>Median</th><th>Std Dev</th><th>Min</th><th>Max</th><th>Q25</th><th>Q75</th><th>Skewness</th><th>CV %</th></tr></thead>
+        <tbody>`;
+    Object.entries(stats.numeric).forEach(([col, s]) => {
+      const sk = Math.abs(s.skewness);
+      const skColor = sk>1.5 ? 'var(--rose)' : sk>0.8 ? 'var(--amber)' : 'var(--text)';
+      html += `<tr>
+        <td class="td-label">${col}</td>
+        <td>${s.mean}</td><td>${s.median}</td><td>${s.std}</td>
+        <td>${s.min}</td><td>${s.max}</td>
+        <td>${s.q25}</td><td>${s.q75}</td>
+        <td style="color:${skColor};font-weight:${sk>0.8?700:400}">${s.skewness}</td>
+        <td>${s.cv}%</td>
+      </tr>`;
+    });
+    html += '</tbody></table></div></div>';
+  }
+
+  if (Object.keys(stats.categorical||{}).length) {
+    html += `<div class="card card-flush mb-md"><div style="padding:1.25rem 1.5rem .75rem" class="font-bold"><i class="bi bi-bar-chart text-cyan"></i> Categorical Statistics</div>
+      <div class="table-wrapper"><table class="dl-table">
+        <thead><tr><th>Column</th><th>Unique</th><th>Top Value</th><th>Top Count</th><th>Top %</th><th>Top 5 Values</th></tr></thead>
+        <tbody>`;
+    Object.entries(stats.categorical).forEach(([col, s]) => {
+      const top5 = Object.entries(s.top_10||{}).slice(0,5).map(([k,v])=>`${k}:${v}`).join(', ');
+      html += `<tr>
+        <td class="td-label">${col}</td>
+        <td>${s.unique_count.toLocaleString()}</td>
+        <td>${String(s.top_value).slice(0,30)}</td>
+        <td>${s.top_count.toLocaleString()}</td>
+        <td><span class="badge badge-cyan">${s.top_pct}%</span></td>
+        <td class="text-xs text-muted font-mono">${top5}</td>
+      </tr>`;
+    });
+    html += '</tbody></table></div></div>';
+  }
+
+  // Correlation matrix
+  if (stats.correlation) {
+    const cols = Object.keys(stats.correlation);
+    if (cols.length >= 2) {
+      html += `<div class="card card-flush"><div style="padding:1.25rem 1.5rem .75rem" class="font-bold"><i class="bi bi-grid-3x3 text-emerald"></i> Correlation Matrix</div>
+        <div class="table-wrapper"><table class="dl-table">
+          <thead><tr><th></th>${cols.map(c=>`<th style="text-align:center">${c}</th>`).join('')}</tr></thead>
+          <tbody>`;
+      cols.forEach(row => {
+        html += `<tr><td class="td-label">${row}</td>`;
+        cols.forEach(col => {
+          const val = (stats.correlation[row]||{})[col]??0;
+          const abs = Math.abs(val);
+          let bg = 'transparent';
+          if (abs > 0.85) bg = val>0 ? 'rgba(99,102,241,0.3)' : 'rgba(239,68,68,0.3)';
+          else if (abs > 0.6) bg = val>0 ? 'rgba(99,102,241,0.15)' : 'rgba(239,68,68,0.15)';
+          else if (abs > 0.3) bg = 'rgba(99,102,241,0.06)';
+          html += `<td class="corr-cell" style="background:${bg};color:${abs>0.6?'var(--text)':'var(--text2)'};font-weight:${abs>0.6?700:400}">${val}</td>`;
+        });
+        html += '</tr>';
+      });
+      html += '</tbody></table></div></div>';
+    }
+  }
+
+  document.getElementById('statsContent').innerHTML = html || '<div class="card empty-state"><p class="text-muted">No statistics available.</p></div>';
+}
+
+// ── Insights ───────────────────────────────────────────────────
+function renderInsights(insights) {
+  const SEV = { info:'indigo', success:'emerald', warning:'amber', danger:'rose' };
+  let html = '';
+  insights.forEach(ins => {
+    const c = SEV[ins.severity||'info']||'indigo';
+    html += `<div class="insight-card" style="--accent:var(--${c})">
+      <div class="flex gap-sm mb-sm" style="align-items:flex-start">
+        <span style="font-size:1.1rem">${ins.icon}</span>
+        <div style="flex:1">
+          <div class="insight-badge text-${c}">${ins.category}</div>
+          <div class="insight-title">${ins.title}</div>
+        </div>
+      </div>
+      <div class="insight-text">${ins.text}</div>
+    </div>`;
+  });
+  document.getElementById('insightsContent').innerHTML = html ||
+    '<div class="card empty-state" style="grid-column:1/-1"><p class="text-muted">No insights generated.</p></div>';
+}
+
+// ── Report generation ──────────────────────────────────────────
+async function generateReport(type) {
+  const idMap  = { pdf: ['btnPDF','btnPDF2'], xlsx: ['btnXLSX','btnXLSX2'] };
+  const btns   = idMap[type].map(id => document.getElementById(id)).filter(Boolean);
+  btns.forEach(b => { b.disabled=true; b.innerHTML=`<i class="bi bi-hourglass-split"></i> Generating…`; });
+
+  try {
+    const r = await fetch(`/report/generate/${DATASET_ID}`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({type})
+    });
+    const data = await r.json();
+    if (data.success) {
+      showToast(
+        `✅ Report generated! <a href="/report/download/${data.report_id}" style="color:var(--cyan);font-weight:600;text-decoration:underline">Download now</a> or <a href="/reports" style="color:var(--text2)">view all reports →</a>`,
+        'success', 7000
+      );
+    } else {
+      showToast(`Error: ${data.error||'Unknown error'}`, 'error');
+    }
+  } catch(e) {
+    showToast(`Failed: ${e.message}`, 'error');
+  } finally {
+    const labelMap = { pdf:'<i class="bi bi-file-pdf"></i> Export PDF', xlsx:'<i class="bi bi-file-earmark-spreadsheet"></i> Export Excel' };
+    btns.forEach(b => { b.disabled=false; b.innerHTML=labelMap[type]; });
+  }
+}
+
+// Re-apply chart themes when toggled
+document.getElementById('themeToggle').addEventListener('click', () => {
+  if (!chartsRendered || !analysisData) return;
+  setTimeout(() => {
+    analysisData.charts.forEach((ch, i) => {
+      const el = document.getElementById(`chart-${i}`);
+      if (el) {
+        const t = getPlotlyTheme();
+        Plotly.relayout(el, { ...t, margin:{l:45,r:20,t:45,b:45} });
+      }
+    });
+  }, 120);
+});
+</script>
+{% endblock %}
