@@ -1,0 +1,78 @@
+{% extends 'base.html' %}
+{% block title %}Datasets · DataLens{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div class="breadcrumb"><a href="/dashboard">Dashboard</a><i class="bi bi-chevron-right"></i><span>Datasets</span></div>
+  <div class="flex-between flex-wrap gap-md">
+    <div>
+      <h1 class="page-title">Datasets</h1>
+      <p class="page-sub">Manage all uploaded datasets</p>
+    </div>
+    <a href="/upload" class="btn btn-primary"><i class="bi bi-plus-lg"></i> Upload New</a>
+  </div>
+</div>
+
+{% if datasets %}
+<div class="card card-flush">
+  <div class="flex-between" style="padding:1.25rem 1.5rem .75rem;flex-wrap:wrap;gap:.75rem">
+    <div class="font-bold">{{ datasets|length }} Dataset{{ 's' if datasets|length != 1 }}</div>
+    <input type="text" id="dsSearch" class="form-control" placeholder="Search datasets…" style="width:220px" oninput="filterDatasets(this.value)">
+  </div>
+  <div class="table-wrapper">
+    <table class="dl-table">
+      <thead>
+        <tr><th>Dataset</th><th>Type</th><th>Rows</th><th>Columns</th><th>Size</th><th>Description</th><th>Uploaded</th><th>Actions</th></tr>
+      </thead>
+      <tbody>
+        {% for ds in datasets %}
+        <tr class="ds-row" data-name="{{ ds.name|lower }}">
+          <td class="td-label">
+            <div class="flex gap-sm">
+              <i class="bi bi-file-earmark-{% if ds.file_type=='csv' %}text{% elif ds.file_type in ('xlsx','xls') %}spreadsheet{% else %}code{% endif %}"
+                 style="color:var(--indigo);font-size:1.1rem"></i>
+              <div>
+                <div style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="{{ ds.name }}">{{ ds.name }}</div>
+                <div class="text-xs text-muted font-mono">ID #{{ ds.id }}</div>
+              </div>
+            </div>
+          </td>
+          <td><span class="badge badge-indigo">{{ ds.file_type.upper() }}</span></td>
+          <td>{{ '{:,}'.format(ds.num_rows) }}</td>
+          <td>{{ ds.num_cols }}</td>
+          <td class="text-muted">{{ ds.file_size }} MB</td>
+          <td class="text-muted text-xs" style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ ds.description or '—' }}</td>
+          <td class="text-muted">{{ ds.uploaded_at.strftime('%b %d, %Y') }}</td>
+          <td>
+            <div class="flex gap-sm flex-wrap">
+              <a href="/preview/{{ ds.id }}"  class="btn btn-outline btn-sm" title="Preview"><i class="bi bi-eye"></i></a>
+              <a href="/analyze/{{ ds.id }}"  class="btn btn-primary btn-sm" title="Analyze"><i class="bi bi-graph-up"></i> Analyze</a>
+              <form action="/dataset/delete/{{ ds.id }}" method="POST" style="display:inline" onsubmit="return confirm('Delete this dataset and all its reports?')">
+                <button type="submit" class="btn btn-danger btn-sm" title="Delete"><i class="bi bi-trash"></i></button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="card empty-state" style="padding:5rem 2rem">
+  <div class="empty-state-icon">🗂️</div>
+  <h3>No Datasets Yet</h3>
+  <p>Upload your first CSV, Excel, or JSON file to get started with automated analysis.</p>
+  <a href="/upload" class="btn btn-primary"><i class="bi bi-cloud-upload"></i> Upload Dataset</a>
+</div>
+{% endif %}
+{% endblock %}
+{% block scripts %}
+<script>
+function filterDatasets(q) {
+  q = q.toLowerCase();
+  document.querySelectorAll('.ds-row').forEach(row => {
+    row.style.display = row.dataset.name.includes(q) ? '' : 'none';
+  });
+}
+</script>
+{% endblock %}
