@@ -1,0 +1,93 @@
+{% extends 'base.html' %}
+{% block title %}Profile · DataLens{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div class="breadcrumb"><a href="/">Dashboard</a><i class="bi bi-chevron-right"></i><span>Profile</span></div>
+  <h1 class="page-title">My Profile</h1>
+</div>
+
+<div class="grid g-2" style="gap:1.5rem;align-items:start">
+  <!-- Left: User card -->
+  <div>
+    <div class="card" style="text-align:center;margin-bottom:1rem">
+      <div style="width:80px;height:80px;background:{{ user.avatar_color }};border-radius:20px;display:flex;align-items:center;justify-content:center;font-size:2rem;font-weight:800;color:#fff;margin:0 auto 1rem;box-shadow:0 0 30px {{ user.avatar_color }}66">
+        {{ user.username[0].upper() }}
+      </div>
+      <h3 style="font-weight:800;font-size:1.25rem;margin-bottom:.25rem">{{ user.username }}</h3>
+      <p class="text-muted text-sm">{{ user.email }}</p>
+      <p class="text-muted text-xs" style="margin-top:.35rem">Member since {{ user.created_at.strftime('%B %Y') }}</p>
+
+      <div class="grid g-2" style="margin-top:1.25rem;gap:.75rem">
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:.85rem;text-align:center">
+          <div style="font-size:1.5rem;font-weight:800;color:var(--indigo)">{{ datasets|length }}</div>
+          <div class="text-xs text-muted">Datasets</div>
+        </div>
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:.85rem;text-align:center">
+          <div style="font-size:1.5rem;font-weight:800;color:var(--cyan)">{{ reports|length }}</div>
+          <div class="text-xs text-muted">Reports</div>
+        </div>
+      </div>
+
+      <div style="margin-top:1.25rem;padding-top:1rem;border-top:1px solid var(--border)">
+        <a href="/upload"  class="btn btn-primary w-full" style="justify-content:center;margin-bottom:.5rem"><i class="bi bi-cloud-upload"></i> Upload Dataset</a>
+        <a href="/logout"  class="btn btn-outline w-full"  style="justify-content:center;color:var(--rose);border-color:rgba(239,68,68,.3)"><i class="bi bi-box-arrow-right"></i> Logout</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right: Datasets + Reports -->
+  <div>
+    <!-- Datasets -->
+    <div class="card card-flush mb-md">
+      <div class="flex-between" style="padding:1.1rem 1.25rem .75rem">
+        <div class="font-bold">My Datasets</div>
+        <a href="/datasets" class="btn btn-outline btn-sm">View All</a>
+      </div>
+      <div class="table-wrapper">
+        <table class="dl-table">
+          <thead><tr><th>Name</th><th>Type</th><th>Rows</th><th>Uploaded</th><th></th></tr></thead>
+          <tbody>
+            {% for ds in datasets[:8] %}
+            <tr>
+              <td class="td-label" style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ ds.name }}</td>
+              <td><span class="badge badge-indigo">{{ ds.file_type.upper() }}</span></td>
+              <td>{{ '{:,}'.format(ds.num_rows) }}</td>
+              <td class="text-muted">{{ ds.uploaded_at.strftime('%b %d') }}</td>
+              <td><a href="/analyze/{{ ds.id }}" class="btn btn-primary btn-sm"><i class="bi bi-graph-up"></i></a></td>
+            </tr>
+            {% else %}
+            <tr><td colspan="5"><div class="empty-state" style="padding:1.5rem"><p>No datasets yet</p><a href="/upload" class="btn btn-primary btn-sm">Upload</a></div></td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Reports -->
+    <div class="card card-flush">
+      <div class="flex-between" style="padding:1.1rem 1.25rem .75rem">
+        <div class="font-bold">My Reports</div>
+        <a href="/reports" class="btn btn-outline btn-sm">View All</a>
+      </div>
+      <div class="table-wrapper">
+        <table class="dl-table">
+          <thead><tr><th>Name</th><th>Type</th><th>Size</th><th>Created</th><th></th></tr></thead>
+          <tbody>
+            {% for r in reports[:8] %}
+            <tr>
+              <td class="td-label" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ r.name }}</td>
+              <td><span class="badge {% if r.report_type=='pdf' %}badge-rose{% else %}badge-emerald{% endif %}">{{ r.report_type.upper() }}</span></td>
+              <td class="text-muted">{{ r.file_size }}MB</td>
+              <td class="text-muted">{{ r.created_at.strftime('%b %d') }}</td>
+              <td><a href="/report/download/{{ r.id }}" class="btn btn-primary btn-sm"><i class="bi bi-download"></i></a></td>
+            </tr>
+            {% else %}
+            <tr><td colspan="5"><div class="empty-state" style="padding:1.5rem"><p>No reports yet</p></div></td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,356 @@
+{% extends 'base.html' %}
+{% block title %}Preview: {{ dataset.name }} · DataLens{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div class="breadcrumb"><a href="/">Home</a><i class="bi bi-chevron-right"></i><a href="/dashboard">Dashboard</a><i class="bi bi-chevron-right"></i><a href="/datasets">Datasets</a><i class="bi bi-chevron-right"></i><span>Preview</span></div>
+  <div class="flex-between flex-wrap gap-md">
+    <div>
+      <h1 class="page-title">{{ dataset.name }}</h1>
+      <p class="page-sub">{{ '{:,}'.format(info.shape.rows) }} rows · {{ info.shape.cols }} columns · {{ dataset.file_size }} MB · uploaded {{ dataset.uploaded_at.strftime('%b %d, %Y') }}</p>
+    </div>
+    <a href="/analyze/{{ dataset.id }}" class="btn btn-primary btn-lg"><i class="bi bi-graph-up-arrow"></i> Run Analysis</a>
+  </div>
+</div>
+
+<!-- Overview Metrics -->
+<div class="grid g-4 mb-lg">
+  <div class="metric-card" style="--accent-color:var(--indigo)">
+    <div class="metric-icon" style="background:var(--indigo-dim);color:var(--indigo);margin-bottom:.5rem"><i class="bi bi-grid-3x3"></i></div>
+    <div class="metric-value text-indigo">{{ '{:,}'.format(info.shape.rows) }}</div>
+    <div class="metric-label">Total Rows</div>
+  </div>
+  <div class="metric-card" style="--accent-color:var(--cyan)">
+    <div class="metric-icon" style="background:var(--cyan-dim);color:var(--cyan);margin-bottom:.5rem"><i class="bi bi-columns-gap"></i></div>
+    <div class="metric-value text-cyan">{{ info.shape.cols }}</div>
+    <div class="metric-label">Columns</div>
+  </div>
+  <div class="metric-card" style="--accent-color:{% if info.missing_total > 0 %}var(--rose){% else %}var(--emerald){% endif %}">
+    <div class="metric-icon" style="background:{% if info.missing_total > 0 %}var(--rose-dim){% else %}var(--emerald-dim){% endif %};color:{% if info.missing_total > 0 %}var(--rose){% else %}var(--emerald){% endif %};margin-bottom:.5rem"><i class="bi bi-{% if info.missing_total > 0 %}exclamation-triangle{% else %}check-circle{% endif %}"></i></div>
+    <div class="metric-value" style="color:{% if info.missing_total > 0 %}var(--rose){% else %}var(--emerald){% endif %}">{{ '{:,}'.format(info.missing_total) }}</div>
+    <div class="metric-label">Missing Values</div>
+  </div>
+  <div class="metric-card" style="--accent-color:var(--amber)">
+    <div class="metric-icon" style="background:var(--amber-dim);color:var(--amber);margin-bottom:.5rem"><i class="bi bi-copy"></i></div>
+    <div class="metric-value text-amber">{{ info.duplicate_rows }}</div>
+    <div class="metric-label">Duplicate Rows</div>
+  </div>
+</div>
+
+<div class="grid g-2 mb-lg" style="gap:1.5rem">
+  <!-- Column Info -->
+  <div class="card card-flush" style="grid-column:1/-1">
+    <div class="flex-between" style="padding:1.25rem 1.5rem .75rem">
+      <div class="font-bold"><i class="bi bi-columns-gap text-indigo"></i> Column Details</div>
+      <div class="flex gap-sm">
+        <span class="badge badge-indigo">{{ info.numeric_count }} Numeric</span>
+        <span class="badge badge-cyan">{{ info.categorical_count }} Categorical</span>
+        <span class="badge badge-amber">{{ info.datetime_count }} Datetime</span>
+      </div>
+    </div>
+    <div class="table-wrapper">
+      <table class="dl-table">
+        <thead>
+          <tr><th>#</th><th>Column Name</th><th>Type</th><th>Kind</th><th>Missing</th><th>Missing %</th><th>Unique Values</th><th>Sample</th></tr>
+        </thead>
+        <tbody>
+          {% for col in info.columns %}
+          <tr>
+            <td class="text-muted">{{ loop.index }}</td>
+            <td class="td-label">{{ col.name }}</td>
+            <td><span class="font-mono text-xs" style="color:var(--text2)">{{ col.dtype }}</span></td>
+            <td>
+              {% if col.kind == 'numeric' %}
+                <span class="badge badge-indigo"><i class="bi bi-123"></i> Numeric</span>
+              {% elif col.kind == 'datetime' %}
+                <span class="badge badge-amber"><i class="bi bi-calendar"></i> Datetime</span>
+              {% else %}
+                <span class="badge badge-cyan"><i class="bi bi-fonts"></i> Text</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if col.missing > 0 %}
+                <span class="text-rose font-bold">{{ col.missing }}</span>
+              {% else %}
+                <span class="text-emerald"><i class="bi bi-check2"></i> None</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if col.missing_pct > 0 %}
+                <div class="flex gap-sm" style="align-items:center">
+                  <div class="stat-bar" style="width:60px"><div class="stat-fill fill-amber" style="width:{{ col.missing_pct }}%"></div></div>
+                  <span class="text-xs text-muted">{{ col.missing_pct }}%</span>
+                </div>
+              {% else %}—{% endif %}
+            </td>
+            <td>{{ '{:,}'.format(col.unique) }}</td>
+            <td class="text-muted text-xs font-mono" style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ col.sample }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Data Cleaning Options -->
+<div class="card mb-lg" style="border-color:rgba(99,102,241,.25);background:linear-gradient(135deg,rgba(99,102,241,.05),var(--surface))">
+  <div class="flex-between flex-wrap gap-md">
+    <div>
+      <div class="font-bold" style="font-size:1.05rem;margin-bottom:.35rem"><i class="bi bi-sliders text-indigo"></i> Configure Data Cleaning</div>
+      <p class="text-muted text-sm">Customize how missing values and outliers are handled</p>
+    </div>
+    <button class="btn btn-primary" onclick="toggleCleaningOptions()">
+      <i class="bi bi-gear"></i> Open Cleaning Options
+    </button>
+  </div>
+  
+  <!-- Hidden cleaning options panel -->
+  <div id="cleaningOptions" style="display:none; margin-top:1.5rem; padding:1.5rem; background:var(--surface2); border-radius:12px">
+    <div class="grid g-2" style="gap:1.5rem">
+      <!-- Numeric Strategy -->
+      <div>
+        <label class="form-label"><i class="bi bi-123 text-indigo"></i> Numeric Missing Values</label>
+        <select id="numericStrategy" class="form-control">
+          <option value="median">Fill with Median (Recommended)</option>
+          <option value="mean">Fill with Mean</option>
+          <option value="zero">Fill with Zero</option>
+          <option value="custom">Custom Value</option>
+        </select>
+        <input type="number" id="customNumericFill" class="form-control" placeholder="Enter custom value" style="margin-top:0.5rem;display:none">
+      </div>
+      
+      <!-- Categorical Strategy -->
+      <div>
+        <label class="form-label"><i class="bi bi-fonts text-cyan"></i> Categorical Missing Values</label>
+        <select id="categoricalStrategy" class="form-control">
+          <option value="mode">Fill with Mode (Most Frequent)</option>
+          <option value="custom">Custom Value</option>
+        </select>
+        <input type="text" id="customCategoricalFill" class="form-control" placeholder="Enter custom value" style="margin-top:0.5rem;display:none" value="Unknown">
+      </div>
+    </div>
+    
+    <!-- Advanced Options -->
+    <div style="margin-top:1.5rem;padding-top:1.5rem;border-top:1px solid var(--border)">
+      <div class="font-bold mb-sm" style="font-size:0.95rem">Advanced Options</div>
+      
+      <div class="form-check mb-sm">
+        <label class="form-check-label" style="display:flex;align-items:center;gap:8px;cursor:pointer">
+          <input type="checkbox" id="removeHighMissing" style="width:18px;height:18px">
+          <span>Remove columns with >50% missing values</span>
+        </label>
+      </div>
+      
+      <div class="form-check mb-sm">
+        <label class="form-check-label" style="display:flex;align-items:center;gap:8px;cursor:pointer">
+          <input type="checkbox" id="clipOutliers" style="width:18px;height:18px">
+          <span>Clip extreme outliers (1st-99th percentile)</span>
+        </label>
+      </div>
+      
+      <div class="form-check">
+        <label class="form-check-label" style="display:flex;align-items:center;gap:8px;cursor:pointer">
+          <input type="checkbox" id="standardizeText" style="width:18px;height:18px">
+          <span>Standardize text (trim whitespace, lowercase)</span>
+        </label>
+      </div>
+    </div>
+    
+    <!-- Action Buttons -->
+    <div class="flex gap-sm" style="margin-top:1.5rem">
+      <button class="btn btn-primary" onclick="applyCustomCleaning(event)">
+        <i class="bi bi-magic"></i> Apply & Re-Analyze
+      </button>
+      <button class="btn btn-outline" onclick="toggleCleaningOptions()">
+        Cancel
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Cleaning Report (Hidden by default) -->
+<div id="cleaningReport" class="card mb-lg" style="display:none;background:var(--surface2);border-color:var(--emerald)">
+  <div class="font-bold mb-md" style="color:var(--emerald)"><i class="bi bi-file-earmark-check"></i> Cleaning Report</div>
+  <div class="grid g-3 mb-md">
+    <div class="metric-card" style="--accent-color:var(--rose)">
+      <div class="metric-value text-rose" id="reportRowsRemoved">0</div>
+      <div class="metric-label">Rows Removed</div>
+    </div>
+    <div class="metric-card" style="--accent-color:var(--amber)">
+      <div class="metric-value text-amber" id="reportDuplicates">0</div>
+      <div class="metric-label">Duplicates Found</div>
+    </div>
+    <div class="metric-card" style="--accent-color:var(--cyan)">
+      <div class="metric-value text-cyan" id="reportMissingBefore">0</div>
+      <div class="metric-label">Missing Before</div>
+    </div>
+    <div class="metric-card" style="--accent-color:var(--emerald)">
+      <div class="metric-value text-emerald" id="reportMissingAfter">0</div>
+      <div class="metric-label">Missing After</div>
+    </div>
+    <div class="metric-card" style="--accent-color:var(--indigo)">
+      <div class="metric-value text-indigo" id="reportColumnsDropped">0</div>
+      <div class="metric-label">Columns Dropped</div>
+    </div>
+    <div class="metric-card" style="--accent-color:var(--violet)">
+      <div class="metric-value text-violet" id="reportStrategies">0</div>
+      <div class="metric-label">Operations Applied</div>
+    </div>
+  </div>
+  <div>
+    <div class="font-bold mb-sm" style="font-size:0.9rem">Operations Performed:</div>
+    <ul id="strategiesList" style="list-style:none;padding:0;margin:0"></ul>
+  </div>
+</div>
+
+<!-- Data Preview -->
+<div class="card card-flush mb-lg">
+  <div class="flex-between" style="padding:1.25rem 1.5rem .75rem">
+    <div class="font-bold"><i class="bi bi-table text-cyan"></i> Data Sample — First 15 Rows</div>
+    <span class="text-muted text-sm">Showing 15 of {{ '{:,}'.format(info.shape.rows) }} rows</span>
+  </div>
+  <div class="table-wrapper">
+    <table class="dl-table">
+      <thead>
+        <tr>
+          <th style="color:var(--text3)">#</th>
+          {% for col in cols %}<th>{{ col }}</th>{% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in preview_rows %}
+        <tr>
+          <td class="text-muted">{{ loop.index }}</td>
+          {% for col in cols %}
+          <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ row[col] if row[col] is not none else '—' }}</td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- CTA -->
+<div class="card" style="background:linear-gradient(135deg,var(--indigo-dim),var(--surface));border-color:rgba(99,102,241,.3)">
+  <div class="flex-between flex-wrap gap-md">
+    <div>
+      <div class="font-bold" style="font-size:1.05rem;margin-bottom:.35rem">Ready to dive deeper?</div>
+      <p class="text-muted text-sm">Generate interactive charts, statistical breakdowns, automated insights, and exportable PDF/Excel reports.</p>
+    </div>
+    <a href="/analyze/{{ dataset.id }}" class="btn btn-primary btn-lg">
+      <i class="bi bi-graph-up-arrow"></i> Run Full Analysis
+    </a>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const datasetId = {{ dataset.id }};
+
+// Toggle cleaning options panel
+function toggleCleaningOptions() {
+  const panel = document.getElementById('cleaningOptions');
+  panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+}
+
+// Show/hide custom value inputs based on strategy selection
+document.getElementById('numericStrategy').addEventListener('change', function() {
+  const customInput = document.getElementById('customNumericFill');
+  customInput.style.display = this.value === 'custom' ? 'block' : 'none';
+});
+
+document.getElementById('categoricalStrategy').addEventListener('change', function() {
+  const customInput = document.getElementById('customCategoricalFill');
+  customInput.style.display = this.value === 'custom' ? 'block' : 'none';
+});
+
+// Apply custom cleaning
+async function applyCustomCleaning(event) {
+  // Prevent default button behavior
+  if (event) event.preventDefault();
+  
+  // Gather options from UI
+  const options = {
+    numeric_strategy: document.getElementById('numericStrategy').value,
+    categorical_strategy: document.getElementById('categoricalStrategy').value,
+    remove_high_missing: document.getElementById('removeHighMissing').checked,
+    clip_outliers: document.getElementById('clipOutliers').checked,
+    standardize_text: document.getElementById('standardizeText').checked
+  };
+  
+  // Add custom fill values if selected
+  if (options.numeric_strategy === 'custom') {
+    options.custom_numeric_fill = parseFloat(document.getElementById('customNumericFill').value) || 0;
+  }
+  if (options.categorical_strategy === 'custom') {
+    options.custom_categorical_fill = document.getElementById('customCategoricalFill').value || 'Unknown';
+  }
+  
+  // Show loading state
+  const btn = event.target;
+  const originalText = btn.innerHTML;
+  btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Cleaning...';
+  btn.disabled = true;
+  
+  try {
+    // Call API
+    const response = await fetch(`/api/clean/${datasetId}`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(options)
+    });
+    
+    const result = await response.json();
+    
+    if (result.success) {
+      // Display cleaning report
+      displayCleaningReport(result.cleaning_report);
+      
+      // Show success toast
+      showToast('Data cleaned successfully! Check the report below.', 'success');
+      
+      // Optionally redirect to analysis page
+      setTimeout(() => {
+        window.location.href = `/analyze/${datasetId}`;
+      }, 2000);
+    } else {
+      throw new Error(result.error || 'Cleaning failed');
+    }
+  } catch (error) {
+    console.error('Cleaning error:', error);
+    showToast('Error applying cleaning: ' + error.message, 'error');
+  } finally {
+    btn.innerHTML = originalText;
+    btn.disabled = false;
+  }
+}
+
+// Display cleaning report
+function displayCleaningReport(report) {
+  // Update metrics
+  document.getElementById('reportRowsRemoved').textContent = report.rows_removed.toLocaleString();
+  document.getElementById('reportDuplicates').textContent = report.duplicates_removed.toLocaleString();
+  document.getElementById('reportMissingBefore').textContent = report.missing_before.toLocaleString();
+  document.getElementById('reportMissingAfter').textContent = report.missing_after.toLocaleString();
+  document.getElementById('reportColumnsDropped').textContent = report.columns_dropped;
+  document.getElementById('reportStrategies').textContent = report.strategies_used.length;
+  
+  // Populate strategies list
+  const strategiesList = document.getElementById('strategiesList');
+  strategiesList.innerHTML = '';
+  report.strategies_used.forEach(strategy => {
+    const li = document.createElement('li');
+    li.innerHTML = `<i class="bi bi-check-circle-fill text-emerald" style="margin-right:6px"></i>${strategy}`;
+    li.style.cssText = 'padding:6px 0;border-bottom:1px solid var(--border);font-size:0.875rem;color:var(--text2)';
+    strategiesList.appendChild(li);
+  });
+  
+  // Show report panel
+  document.getElementById('cleaningReport').style.display = 'block';
+  
+  // Scroll to report
+  document.getElementById('cleaningReport').scrollIntoView({behavior: 'smooth', block: 'nearest'});
+}
+</script>
+{% endblock %}

@@ -1,0 +1,142 @@
+{% extends 'base.html' %}
+{% block title %}Welcome · DataLens{% endblock %}
+{% block extra_head %}
+<style>
+.overview-hero {
+  background: linear-gradient(135deg, var(--indigo-dim), transparent 60%);
+  border-radius: 16px; padding: 3rem 2rem;
+  border: 1px solid var(--border);
+  margin-bottom: 2.5rem; text-align: center;
+}
+.feature-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; margin: 2rem 0; }
+.feature-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 12px; padding: 1.75rem; text-align: center;
+  transition: all 0.2s ease;
+}
+.feature-card:hover { border-color: var(--indigo); transform: translateY(-2px); box-shadow: var(--shadow); }
+.feature-icon {
+  width: 64px; height: 64px; border-radius: 14px;
+  background: var(--indigo-dim); color: var(--indigo);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.8rem; margin: 0 auto 1.25rem;
+}
+.feature-title { font-weight: 700; font-size: 1.05rem; margin-bottom: 0.5rem; color: var(--text); }
+.feature-desc { font-size: 0.875rem; color: var(--text2); line-height: 1.5; }
+.step-wrapper { display: flex; align-items: center; justify-content: center; gap: 1rem; margin: 2.5rem 0; flex-wrap: wrap; }
+.step-card {
+  display: flex; flex-direction: column; align-items: center; gap: 0.5rem;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 12px; padding: 1.25rem 1.5rem; min-width: 140px;
+}
+.step-number {
+  width: 32px; height: 32px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--indigo), var(--indigo-light));
+  color: #fff; font-weight: 700; font-size: 0.9rem;
+  display: flex; align-items: center; justify-content: center;
+}
+.step-text { font-weight: 600; font-size: 0.9rem; color: var(--text); }
+.cta-section {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 16px; padding: 2.5rem; text-align: center;
+  margin-top: 2.5rem;
+}
+@media (max-width: 900px) { .feature-grid { grid-template-columns: 1fr; } }
+</style>
+{% endblock %}
+{% block content %}
+
+<!-- Hero -->
+<div class="overview-hero">
+  <div style="font-size:3.5rem;margin-bottom:1rem">⚡</div>
+  <h1 style="font-size:2.2rem;font-weight:800;letter-spacing:-0.03em;margin-bottom:0.75rem;color:var(--text)">
+    Welcome to DataLens Analytics
+  </h1>
+  <p style="font-size:1.05rem;color:var(--text2);max-width:680px;margin:0 auto 1.5rem;line-height:1.6">
+    Transform your raw data into actionable insights with AI-powered analysis, 
+    interactive visualizations, and professional reports — all in seconds.
+  </p>
+  <div class="flex gap-sm" style="justify-content:center;margin-top:1.5rem">
+    <a href="/upload" class="btn btn-primary btn-lg"><i class="bi bi-cloud-upload"></i> Start Analyzing</a>
+    <a href="/dashboard" class="btn btn-secondary btn-lg"><i class="bi bi-grid-1x2"></i> Go to Dashboard</a>
+  </div>
+</div>
+
+<!-- Features -->
+<div class="feature-grid">
+  <div class="feature-card">
+    <div class="feature-icon"><i class="bi bi-file-earmark-arrow-up"></i></div>
+    <div class="feature-title">Upload Any Data</div>
+    <div class="feature-desc">CSV, Excel, or JSON — drag and drop your files. Auto-detects schema and cleans data automatically.</div>
+  </div>
+  <div class="feature-card">
+    <div class="feature-icon"><i class="bi bi-cpu-fill"></i></div>
+    <div class="feature-title">AI Analysis</div>
+    <div class="feature-desc">Statistical summaries, pattern detection, and intelligent insights powered by advanced analytics.</div>
+  </div>
+  <div class="feature-card">
+    <div class="feature-icon"><i class="bi bi-graph-up-arrow"></i></div>
+    <div class="feature-title">Visual Insights</div>
+    <div class="feature-desc">Interactive charts and graphs that make complex data easy to understand and present.</div>
+  </div>
+  <div class="feature-card">
+    <div class="feature-icon"><i class="bi bi-file-earmark-pdf-fill"></i></div>
+    <div class="feature-title">Export Reports</div>
+    <div class="feature-desc">Generate professional PDF or Excel reports with one click. Share insights with your team instantly.</div>
+  </div>
+  <div class="feature-card">
+    <div class="feature-icon"><i class="bi bi-shield-check"></i></div>
+    <div class="feature-title">Secure & Private</div>
+    <div class="feature-desc">Your data stays on your device. No uploads to external servers. Complete privacy guaranteed.</div>
+  </div>
+  <div class="feature-card">
+    <div class="feature-icon"><i class="bi bi-lightning-charge-fill"></i></div>
+    <div class="feature-title">Lightning Fast</div>
+    <div class="feature-desc">Process thousands of rows in seconds. Optimized for speed without compromising accuracy.</div>
+  </div>
+</div>
+
+<!-- How It Works -->
+<div class="card" style="margin-top:2.5rem">
+  <div style="text-align:center;margin-bottom:1.5rem">
+    <h2 style="font-size:1.5rem;font-weight:700;margin-bottom:0.5rem">How It Works</h2>
+    <p style="color:var(--text2);font-size:0.9rem">Four simple steps from raw data to actionable insights</p>
+  </div>
+  
+  <div class="step-wrapper">
+    <div class="step-card">
+      <div class="step-number">1</div>
+      <div class="step-text"><i class="bi bi-cloud-upload" style="margin-right:4px"></i> Upload</div>
+    </div>
+    <i class="bi bi-chevron-right" style="color:var(--text3);font-size:1.2rem"></i>
+    <div class="step-card">
+      <div class="step-number">2</div>
+      <div class="step-text"><i class="bi bi-magic" style="margin-right:4px"></i> Analyze</div>
+    </div>
+    <i class="bi bi-chevron-right" style="color:var(--text3);font-size:1.2rem"></i>
+    <div class="step-card">
+      <div class="step-number">3</div>
+      <div class="step-text"><i class="bi bi-graph-up" style="margin-right:4px"></i> Visualize</div>
+    </div>
+    <i class="bi bi-chevron-right" style="color:var(--text3);font-size:1.2rem"></i>
+    <div class="step-card">
+      <div class="step-number">4</div>
+      <div class="step-text"><i class="bi bi-file-check" style="margin-right:4px"></i> Export</div>
+    </div>
+  </div>
+</div>
+
+<!-- CTA -->
+<div class="cta-section">
+  <h2 style="font-size:1.4rem;font-weight:700;margin-bottom:0.75rem">Ready to Unlock Your Data's Potential?</h2>
+  <p style="color:var(--text2);font-size:0.95rem;margin-bottom:1.5rem;max-width:520px">
+    Join analysts and businesses using DataLens to make data-driven decisions faster than ever.
+  </p>
+  <div class="flex gap-sm" style="justify-content:center">
+    <a href="/signup" class="btn btn-primary btn-lg"><i class="bi bi-person-plus-fill"></i> Create Free Account</a>
+    <a href="/login" class="btn btn-outline btn-lg"><i class="bi bi-box-arrow-in-right"></i> Sign In</a>
+  </div>
+  <p style="color:var(--text3);font-size:0.8rem;margin-top:1rem">No credit card required · Get started in 30 seconds</p>
+</div>
+
+{% endblock %}
