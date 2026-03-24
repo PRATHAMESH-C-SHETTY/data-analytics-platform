@@ -6,8 +6,8 @@ from datetime import datetime
 import os, json, uuid
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'datalens-prod-secret-2024-xK9mP2'
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///datalens.db'
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'datalens-prod-secret-2024-xK9mP2')
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///datalens.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['UPLOAD_FOLDER'] = os.path.join(os.path.dirname(__file__), 'uploads')
 app.config['REPORTS_FOLDER'] = os.path.join(os.path.dirname(__file__), 'reports')
